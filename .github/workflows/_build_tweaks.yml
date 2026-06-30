@@ -52,6 +52,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Untap untrusted Homebrew taps
+        run: brew untap aws/tap || true
+
       - name: Install Dependencies
         run: brew install make ldid dpkg
 

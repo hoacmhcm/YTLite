@@ -105,6 +105,9 @@ jobs:
           echo "No output format selected."
           exit 0
 
+      - name: Untap untrusted Homebrew taps
+        run: brew untap aws/tap || true
+
       - name: Install Dependencies
         run: brew install dpkg
 
