@@ -108,10 +108,6 @@ jobs:
             exit 1
           fi
 
-      - name: Patch YouTube Plus 5.2b4 download button identifier
-        if: ${{ inputs.tweak_version == '5.2b4' || inputs.tweak_url != '' }}
-        run: scripts/patch-ytplus-download-id.sh ytplus.deb
-
       - name: Clone YouTubeHeader
         if: ${{ inputs.enable_youpip || inputs.enable_ytuhd || inputs.enable_yq || inputs.enable_ryd || inputs.enable_ytabc || inputs.enable_demc }}
         run: |
@@ -237,6 +233,19 @@ jobs:
               exit 1
             }
           done
+
+          tmpdir="$(mktemp -d)"
+          trap 'rm -rf "$tmpdir"' EXIT
+          tar -xf ytplus.deb --directory="$tmpdir"
+          data_archive="$(find "$tmpdir" -maxdepth 1 -name 'data.*' -print -quit)"
+          if [ -z "$data_archive" ]; then
+            echo "::error::ytplus.deb is missing a data archive"
+            exit 1
+          fi
+          tar -tf "$data_archive" | grep -Eq '(^|/)Library/MobileSubstrate/DynamicLibraries/YTLite\.dylib$' || {
+            echo "::error::ytplus.deb does not contain YTLite.dylib"
+            exit 1
+          }
 
           for f in *.appex; do
             [ -e "$f" ] || continue

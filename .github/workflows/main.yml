@@ -108,6 +108,9 @@ jobs:
       contents: write
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
       - name: Download built debs
         uses: actions/download-artifact@v8
         with:
@@ -152,6 +155,10 @@ jobs:
           printf 'Injecting files:\n'
           printf '  %s\n' "${tweaks[@]}"
           cyan -i youtube.ipa -o "$output" -uwef "${tweaks[@]}" -n "${{ github.event.inputs.display_name }}" -b ${{ github.event.inputs.bundle_id }}
+
+      - name: Patch injected YouTube Plus download button identifier
+        if: ${{ github.event.inputs.tweak_version == '5.2b4' }}
+        run: scripts/patch-injected-ipa.sh YouTubePlus_${{ github.event.inputs.tweak_version }}.ipa
 
       - name: Validate injected IPA
         run: |

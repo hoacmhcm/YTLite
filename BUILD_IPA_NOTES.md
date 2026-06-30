@@ -134,19 +134,20 @@ File chính:
 scripts/patch-ytplus-download-id.sh
 ```
 
-Workflow gọi script này tại:
+Workflow patch trực tiếp file IPA sau khi `cyan` inject xong:
 
 ```text
-.github/workflows/_build_tweaks.yml
+.github/workflows/main.yml
+.github/workflows/ytp_beta.yml
 ```
 
 Step:
 
 ```text
-Patch YouTube Plus 5.2b4 download button identifier
+Patch injected YouTube Plus download button identifier
 ```
 
-Script này chạy sau khi download `ytplus.deb`, trước khi upload artifact để job package inject vào IPA.
+Lý do: để `cyan` xử lý `.deb` gốc trước, sau đó mới patch `Payload/YouTube.app/Frameworks/YTLite.dylib` trong IPA. Cách này tránh rủi ro repack `.deb` làm `cyan` không inject đủ file.
 
 ### Fix corrupt ytplus.deb sau khi patch
 
@@ -159,7 +160,15 @@ data_tar = glob(f"{t2}/data.*")[0]
 
 Nguyên nhân thực tế: trên `macos-26-arm64`, `ar -cr patched.deb ...` tạo archive kiểu static library có `__.SYMDEF SORTED`, làm `ytplus.deb` còn khoảng `96B` và mất `data.tar.*`. `cyan` extract deb nên không thấy `data.*`.
 
-Fix hiện tại: `scripts/patch-ytplus-download-id.sh` không dùng `ar -cr` để repack deb nữa, mà ghi ar archive chuẩn Debian bằng Python. Script cũng validate lại `patched.deb` phải có `data.*`.
+Fix trước đó: `scripts/patch-ytplus-download-id.sh` không dùng `ar -cr` để repack deb nữa, mà ghi ar archive chuẩn Debian bằng Python. Script cũng validate lại `patched.deb` phải có `data.*`.
+
+Fix mới hơn: workflow không patch/repack `ytplus.deb` trước khi inject nữa. Package job inject `.deb` gốc bằng `cyan`, sau đó chạy:
+
+```bash
+scripts/patch-injected-ipa.sh YouTubePlus_5.2b4.ipa
+```
+
+Script này mở IPA, patch `Payload/YouTube.app/Frameworks/YTLite.dylib`, rồi zip lại IPA.
 
 Ngoài ra `_build_tweaks.yml` có thêm step `Validate tweak artifacts` để fail sớm nếu `.deb` nào không còn `data.*`.
 
