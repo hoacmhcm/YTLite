@@ -222,6 +222,25 @@ jobs:
           git checkout
           mv *.appex ..
 
+      - name: Validate tweak artifacts
+        run: |
+          for f in *.deb; do
+            [ -f "$f" ] || continue
+            echo "Validating $f"
+            tar -tf "$f" | grep -Eq '^data\.' || {
+              echo "::error::$f is not a valid Debian package: missing data archive"
+              exit 1
+            }
+          done
+
+          for f in *.appex; do
+            [ -e "$f" ] || continue
+            if [ ! -d "$f" ]; then
+              echo "::error::$f is not an app extension directory"
+              exit 1
+            fi
+          done
+
       - name: Upload built debs as artifacts
         uses: actions/upload-artifact@v7
         with:

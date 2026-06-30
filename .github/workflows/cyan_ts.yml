@@ -118,11 +118,17 @@ jobs:
       - name: Generate .cyan file
         if: ${{ github.event.inputs.create_cyan }}
         run: |
-          tweaks="ytplus.deb OpenYoutubeSafariExtension.appex"
+          tweaks=(ytplus.deb)
           for f in *.deb; do
-            [ -f "$f" ] && tweaks="$tweaks $f"
+            [ -f "$f" ] || continue
+            [ "$f" = "ytplus.deb" ] && continue
+            tweaks+=("$f")
           done
-          cgen -uwef $tweaks -n "${{ github.event.inputs.display_name }}" -b ${{ github.event.inputs.bundle_id }} -o cyan_YouTubePlus_${{ github.event.inputs.tweak_version }}.cyan
+          [ -d OpenYoutubeSafariExtension.appex ] && tweaks+=(OpenYoutubeSafariExtension.appex)
+
+          printf 'Generating .cyan with files:\n'
+          printf '  %s\n' "${tweaks[@]}"
+          cgen -uwef "${tweaks[@]}" -n "${{ github.event.inputs.display_name }}" -b ${{ github.event.inputs.bundle_id }} -o cyan_YouTubePlus_${{ github.event.inputs.tweak_version }}.cyan
 
       - name: Generate .zip file for TrollFools
         if: ${{ github.event.inputs.create_tf }}

@@ -135,11 +135,17 @@ jobs:
 
       - name: Inject tweaks into IPA
         run: |
-          tweaks="ytplus.deb OpenYoutubeSafariExtension.appex"
+          tweaks=(ytplus.deb)
           for f in *.deb; do
-            [ -f "$f" ] && tweaks="$tweaks $f"
+            [ -f "$f" ] || continue
+            [ "$f" = "ytplus.deb" ] && continue
+            tweaks+=("$f")
           done
-          cyan -i youtube.ipa -o YouTubePlus_${{ github.event.inputs.tweak_version }}.ipa -uwef $tweaks -n "${{ github.event.inputs.display_name }}" -b ${{ github.event.inputs.bundle_id }}
+          [ -d OpenYoutubeSafariExtension.appex ] && tweaks+=(OpenYoutubeSafariExtension.appex)
+
+          printf 'Injecting files:\n'
+          printf '  %s\n' "${tweaks[@]}"
+          cyan -i youtube.ipa -o YouTubePlus_${{ github.event.inputs.tweak_version }}.ipa -uwef "${tweaks[@]}" -n "${{ github.event.inputs.display_name }}" -b ${{ github.event.inputs.bundle_id }}
 
       - name: Upload to GitHub Releases
         uses: softprops/action-gh-release@v3

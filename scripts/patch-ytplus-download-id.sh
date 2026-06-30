@@ -109,7 +109,42 @@ PY
     data.tar) COPYFILE_DISABLE=1 tar -cf "$data_archive" -C data . ;;
   esac
 
-  ar -cr patched.deb debian-binary control.tar.* "$data_archive"
+  python3 - patched.deb debian-binary control.tar.* "$data_archive" <<'PY'
+import sys
+from pathlib import Path
+
+out = Path(sys.argv[1])
+members = [Path(arg) for arg in sys.argv[2:]]
+
+with out.open("wb") as archive:
+    archive.write(b"!<arch>\n")
+
+    for member in members:
+        name = member.name
+        if len(name) > 15:
+            raise SystemExit(f"ar member name too long for Debian package: {name}")
+
+        data = member.read_bytes()
+        header = (
+            f"{name}".ljust(16)
+            + f"{0:<12}"
+            + f"{0:<6}"
+            + f"{0:<6}"
+            + f"{0o100644:<8}"
+            + f"{len(data):<10}"
+            + "`\n"
+        ).encode("ascii")
+
+        archive.write(header)
+        archive.write(data)
+        if len(data) % 2:
+            archive.write(b"\n")
+PY
+
+  if ! tar -tf patched.deb | grep -Eq '^data\.'; then
+    echo "Patched deb validation failed: data archive not found" >&2
+    exit 1
+  fi
 )
 
 cp "$tmp_dir/patched.deb" "$output_deb"
