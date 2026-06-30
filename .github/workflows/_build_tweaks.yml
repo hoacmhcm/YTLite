@@ -224,6 +224,11 @@ jobs:
 
       - name: Validate tweak artifacts
         run: |
+          if [ ! -f ytplus.deb ]; then
+            echo "::error::ytplus.deb is missing. Check tweak_version/tweak_url and the YouTube Plus download step."
+            exit 1
+          fi
+
           for f in *.deb; do
             [ -f "$f" ] || continue
             echo "Validating $f"

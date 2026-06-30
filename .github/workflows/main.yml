@@ -135,6 +135,12 @@ jobs:
 
       - name: Inject tweaks into IPA
         run: |
+          if [ ! -f ytplus.deb ]; then
+            echo "::error::Missing ytplus.deb from build-tweaks artifact. Refusing to create an IPA without YouTube Plus."
+            exit 1
+          fi
+
+          output="YouTubePlus_${{ github.event.inputs.tweak_version }}.ipa"
           tweaks=(ytplus.deb)
           for f in *.deb; do
             [ -f "$f" ] || continue
@@ -145,7 +151,29 @@ jobs:
 
           printf 'Injecting files:\n'
           printf '  %s\n' "${tweaks[@]}"
-          cyan -i youtube.ipa -o YouTubePlus_${{ github.event.inputs.tweak_version }}.ipa -uwef "${tweaks[@]}" -n "${{ github.event.inputs.display_name }}" -b ${{ github.event.inputs.bundle_id }}
+          cyan -i youtube.ipa -o "$output" -uwef "${tweaks[@]}" -n "${{ github.event.inputs.display_name }}" -b ${{ github.event.inputs.bundle_id }}
+
+      - name: Validate injected IPA
+        run: |
+          output="YouTubePlus_${{ github.event.inputs.tweak_version }}.ipa"
+          required_paths=(
+            'Payload/YouTube.app/Frameworks/YTLite.dylib'
+            'Payload/YouTube.app/Frameworks/CydiaSubstrate.framework/CydiaSubstrate'
+            'Payload/YouTube.app/YTLite.bundle/Info.plist'
+          )
+          for required_path in "${required_paths[@]}"; do
+            unzip -l "$output" | grep -q "$required_path" || {
+              echo "::error::Injected IPA is missing $required_path."
+              exit 1
+            }
+          done
+
+          tmpdir="$(mktemp -d)"
+          unzip -q "$output" 'Payload/YouTube.app/YouTube' -d "$tmpdir"
+          otool -L "$tmpdir/Payload/YouTube.app/YouTube" | grep -q '@rpath/YTLite.dylib' || {
+            echo "::error::YouTube executable does not load @rpath/YTLite.dylib."
+            exit 1
+          }
 
       - name: Upload to GitHub Releases
         uses: softprops/action-gh-release@v3

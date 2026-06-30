@@ -163,6 +163,34 @@ Fix hiện tại: `scripts/patch-ytplus-download-id.sh` không dùng `ar -cr` đ
 
 Ngoài ra `_build_tweaks.yml` có thêm step `Validate tweak artifacts` để fail sớm nếu `.deb` nào không còn `data.*`.
 
+### Validate IPA đã inject thật sự có YTLite
+
+File:
+
+```text
+.github/workflows/main.yml
+.github/workflows/ytp_beta.yml
+.github/workflows/_build_tweaks.yml
+```
+
+Đã thêm check để tránh trường hợp workflow vẫn tạo `.ipa` nhưng thực tế chỉ là YouTube gốc kèm Safari extension, không có YTPlus.
+
+IPA build đúng phải có ít nhất:
+
+```text
+Payload/YouTube.app/Frameworks/YTLite.dylib
+Payload/YouTube.app/Frameworks/CydiaSubstrate.framework/CydiaSubstrate
+Payload/YouTube.app/YTLite.bundle/Info.plist
+```
+
+Và main executable phải load:
+
+```text
+@rpath/YTLite.dylib
+```
+
+Nếu thiếu một trong hai, Actions sẽ fail trước bước release.
+
 ## Patch nút download nằm ở đâu
 
 Patch không nằm trong source Logos `.x` của repo này. Với YTPlus `5.2b4`, workflow tải prebuilt binary:
@@ -226,4 +254,3 @@ a304b0e Fix Homebrew tap trust in Actions
 c6dca64 Validate IPA URL workflow inputs
 80045e9 Fix YTPlus deb repack for cyan injection
 ```
-
