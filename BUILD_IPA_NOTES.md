@@ -200,6 +200,122 @@ Và main executable phải load:
 
 Nếu thiếu một trong hai, Actions sẽ fail trước bước release.
 
+## Debug crash khi mở app
+
+Khi IPA cài được nhưng mở lên tắt ngay, không đoán từ UI. Lấy log/crash report trước rồi mới sửa.
+
+### Cách 1: xem live log bằng idevicesyslog
+
+Cắm iPhone vào Mac, trust device, rồi chạy:
+
+```bash
+idevicesyslog | tee /tmp/youtube-crash.log
+```
+
+Mở app YouTube/YTLite trên iPhone để nó crash. Sau đó dừng log bằng `Ctrl+C` và lọc các dòng quan trọng:
+
+```bash
+rg -i "youtube|ytlite|cydiasubstrate|substrate|dyld|crash|exception|termination|codesign|signature|library not loaded" /tmp/youtube-crash.log
+```
+
+Cần chú ý các kiểu lỗi:
+
+```text
+Library not loaded
+image not found
+code signature invalid
+no suitable image found
+Terminating app due to uncaught exception
+EXC_BAD_ACCESS
+KERN_INVALID_ADDRESS
+```
+
+### Cách 2: lấy crash report `.ips`
+
+Trên iPhone:
+
+```text
+Settings -> Privacy & Security -> Analytics & Improvements -> Analytics Data
+```
+
+Tìm file dạng:
+
+```text
+YouTube-YYYY-MM-DD-*.ips
+JetsamEvent-YYYY-MM-DD-*.ips
+```
+
+Share file đó về Mac. Khi phân tích, phần quan trọng nhất là:
+
+```text
+Exception Type
+Termination Reason
+Triggered by Thread
+Last Exception Backtrace
+Thread 0 Crashed
+Dyld Error Message
+```
+
+Nếu dùng Xcode:
+
+```text
+Xcode -> Window -> Devices and Simulators -> chọn iPhone -> View Device Logs
+```
+
+Hoặc dùng Console.app:
+
+```text
+Console.app -> chọn iPhone -> filter: YouTube / com.google.ios.youtube / YTLite / dyld
+```
+
+### Checklist cô lập lỗi
+
+1. Cài thử YouTube IPA decrypted chưa inject. Nếu bản gốc cũng crash, lỗi nằm ở IPA nguồn hoặc signing.
+2. Build chỉ với YTPlus `5.2b4`, tắt hết tweak phụ như YouPiP, YTUHD, YouQuality, RYD, YTABConfig, DontEatMyContent. Nếu hết crash, bật từng tweak phụ lại để tìm tweak gây lỗi.
+3. Kiểm tra artifact đã inject thật:
+
+```bash
+unzip -l YouTubePlus_5.2b4.ipa | rg "YTLite.dylib|CydiaSubstrate|YTLite.bundle"
+```
+
+4. Kiểm tra main binary load YTLite:
+
+```bash
+tmpdir="$(mktemp -d)"
+unzip -q YouTubePlus_5.2b4.ipa "Payload/YouTube.app/YouTube" -d "$tmpdir"
+otool -L "$tmpdir/Payload/YouTube.app/YouTube" | rg "YTLite|CydiaSubstrate"
+```
+
+5. Nếu log có `code signature invalid`, vấn đề nằm ở bước signing/cài bằng SideStore/AltStore.
+6. Nếu log có `Library not loaded` hoặc `image not found`, vấn đề nằm ở path/framework bị thiếu trong IPA.
+7. Nếu log có `Terminating app due to uncaught exception` hoặc `unrecognized selector`, khả năng cao hook/tweak không còn tương thích với version YouTube hiện tại.
+8. Nếu chỉ crash khi đã đăng nhập hoặc khi mở tab cụ thể, lấy log đúng thao tác đó vì lỗi có thể nằm trong hook UI/account chứ không phải launch.
+
+Khi cần trace tiếp, gửi lại ít nhất 50-100 dòng log quanh thời điểm crash và phần `Exception Type`/`Termination Reason` trong `.ips`.
+
+### Crash đã gặp: YTIShareEntityEndpoint shareEntityEndpoint
+
+Log:
+
+```text
+*** Terminating app due to uncaught exception 'NSInvalidArgumentException',
+reason: '+[YTIShareEntityEndpoint shareEntityEndpoint]: unrecognized selector sent to class'
+```
+
+Kết luận: đây không phải lỗi signing. Đây là lỗi compatibility giữa YTPlus `5.2b4` và YouTube mới, liên quan module share/native share. YouTube `21.26.4` không còn selector cũ `shareEntityEndpoint`.
+
+Workaround:
+
+1. Không bật `NativeShare` trong YTLite settings.
+2. Nếu app crash trước khi vào settings, xóa app khỏi iPhone để clear app data/preferences rồi cài lại.
+3. Nếu vẫn cần chống preference cũ bị giữ lại, script patch binary sẽ đổi key:
+
+```text
+nativeShare -> nativeShar0
+```
+
+Việc này làm YTPlus không đọc lại setting `nativeShare=true` cũ, tránh crash do module share cũ. Tính năng Native Share coi như bị tắt trên YouTube `21.26.4`.
+
 ## Patch nút download nằm ở đâu
 
 Patch không nằm trong source Logos `.x` của repo này. Với YTPlus `5.2b4`, workflow tải prebuilt binary:
